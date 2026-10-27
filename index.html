@@ -1,0 +1,117 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Control de 36 LEDs</title>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      background: #f2f2f2;
+      padding: 20px;
+    }
+
+    .contenedor {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 10px;
+      max-width: 420px;
+      margin: 20px auto;
+    }
+
+    .led {
+      padding: 15px 0;
+      border: none;
+      border-radius: 8px;
+      background: #ddd;
+      cursor: pointer;
+      font-size: 16px;
+    }
+
+    .led.activo {
+      background: #19a35b;
+      color: white;
+    }
+
+    #resultado {
+      padding: 15px;
+      background: white;
+      border-radius: 8px;
+      overflow-wrap: anywhere;
+    }
+  </style>
+</head>
+
+<body>
+
+  <h2>Control de 36 LEDs</h2>
+
+  <div class="contenedor" id="panel"></div>
+
+  <h3>LEDs encendidos:</h3>
+  <p id="resultado">Ninguno</p>
+
+  <button onclick="limpiar()">Apagar todos</button>
+
+  <script>
+    // Variable que guarda los LEDs seleccionados
+    let ledsEncendidos = [];
+
+    const panel = document.getElementById("panel");
+    const resultado = document.getElementById("resultado");
+
+    // Crear los 36 botones
+    for (let i = 1; i <= 36; i++) {
+      const boton = document.createElement("button");
+
+      boton.textContent = i;
+      boton.className = "led";
+
+      boton.onclick = function() {
+        cambiarLED(i, boton);
+      };
+
+      panel.appendChild(boton);
+    }
+
+    function cambiarLED(numero, boton) {
+      const indice = ledsEncendidos.indexOf(numero);
+
+      if (indice === -1) {
+        ledsEncendidos.push(numero);
+        boton.classList.add("activo");
+      } else {
+        ledsEncendidos.splice(indice, 1);
+        boton.classList.remove("activo");
+      }
+
+      ledsEncendidos.sort((a, b) => a - b);
+
+      actualizar();
+    }
+
+    function actualizar() {
+      // Variable de texto separada por comas
+      let listaLEDs = ledsEncendidos.join(",");
+
+      resultado.textContent = listaLEDs || "Ninguno";
+
+      console.log("LEDs:", listaLEDs);
+    }
+
+    function limpiar() {
+      ledsEncendidos = [];
+
+      document.querySelectorAll(".led").forEach(boton => {
+        boton.classList.remove("activo");
+      });
+
+      actualizar();
+    }
+  </script>
+
+</body>
+</html>
