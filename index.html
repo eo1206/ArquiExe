@@ -1,19 +1,713 @@
-<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#101827"><title>Control de LEDs</title>
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#eae9e4">
+<title>Residence | Smart Home</title>
+
 <style>
-:root{color-scheme:dark;--bg:#101827;--panel:#182438;--muted:#a9b8cc;--text:#f4f7fb;--accent:#42d392;--border:#2a3a52}*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(ellipse at top,#1c3150 0,#101827 55%);color:var(--text);font:16px/1.45 system-ui,sans-serif;padding:28px 16px}main{width:min(100%,680px);margin:auto}.eyebrow{color:var(--accent);font-size:.76rem;font-weight:800;letter-spacing:.14em;text-transform:uppercase}h1{font-size:clamp(1.8rem,6vw,2.6rem);line-height:1.1;margin:.45rem 0}.sub,.mapping{color:var(--muted)}.card{background:rgba(24,36,56,.94);border:1px solid var(--border);border-radius:18px;padding:20px;margin:14px 0;box-shadow:0 14px 40px #0002}.top{display:flex;justify-content:space-between;gap:12px;align-items:center}.status{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:.9rem}.dot{width:9px;height:9px;background:var(--accent);border-radius:50%}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}button{font:inherit;cursor:pointer;border:1px solid var(--border);border-radius:12px;color:var(--text);background:#22324a;padding:11px 16px}button.primary{background:var(--accent);border-color:var(--accent);color:#092218;font-weight:750}button:disabled{opacity:.55;cursor:wait}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.led{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px;background:#111d2e;border:1px solid var(--border);border-radius:14px}.led strong{display:block}.led small{color:var(--muted)}.toggle{min-width:88px;font-weight:750}.toggle.on{background:var(--accent);border-color:var(--accent);color:#092218}.message{min-height:1.4em;color:var(--muted);font-size:.9rem;margin:12px 0 0}.mapping{font-size:.88rem;margin:0}.mapping code{color:#d9e8fb}@media(max-width:430px){body{padding:20px 12px}.grid{gap:9px}.led{padding:12px 10px}.card{padding:16px}.actions button{flex:1}}
-</style></head><body><main><div class="eyebrow">ESP32 · 74HC595N</div><h1>Control de iluminación</h1><p class="sub">Conectado directamente a la red Wi-Fi del ESP32.</p>
-<section class="card"><div class="top"><strong>30 LEDs en tres zonas</strong><div class="status"><span class="dot"></span><span id="connection">Conectado</span></div></div><div class="actions"><button class="primary" id="allOn">Encender todos</button><button id="allOff">Apagar todos</button></div><p class="message" id="message" aria-live="polite"></p></section>
-<section class="card"><h2>Planta alta · 13 LEDs</h2><div class="grid" id="alta"></div></section>
-<section class="card"><h2>Sótano · 4 LEDs</h2><div class="grid" id="sotano"></div></section>
-<section class="card"><h2>Planta baja · 13 LEDs</h2><div class="grid" id="baja"></div></section>
-<section class="card"><p class="mapping">Cada zona usa sus propios módulos 74HC595. Los botones cambian solo el LED seleccionado. Datos transmitidos con <code>LSBFIRST</code>.</p></section></main>
+:root {
+  --bg: #eae9e4;
+  --surface: #f7f6f2;
+  --white: #ffffff;
+  --ink: #252927;
+  --muted: #858982;
+  --line: #d9dad3;
+  --green: #647b6e;
+  --green-light: #e2e9e2;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: Inter, "Helvetica Neue", Arial, sans-serif;
+  min-height: 100vh;
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+}
+
+main {
+  max-width: 1050px;
+  margin: auto;
+  padding: 32px 24px 60px;
+}
+
+/* HEADER */
+
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 25px;
+  border-bottom: 1px solid var(--line);
+}
+
+.brand {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: .22em;
+}
+
+.brand span {
+  display: block;
+  font-size: 9px;
+  font-weight: 400;
+  color: var(--muted);
+  letter-spacing: .18em;
+  margin-top: 5px;
+}
+
+.connection {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 11px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.dot {
+  height: 7px;
+  width: 7px;
+  border-radius: 50%;
+  background: var(--green);
+}
+
+/* INTRO */
+
+.intro {
+  padding: 43px 0 30px;
+}
+
+.eyebrow {
+  font-size: 10px;
+  letter-spacing: .2em;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+h1 {
+  font-size: clamp(32px, 6vw, 52px);
+  font-weight: 400;
+  letter-spacing: -.055em;
+  margin: 12px 0;
+}
+
+.intro p {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* GENERAL CONTROL */
+
+.overview {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 38px;
+}
+
+.general {
+  background: var(--ink);
+  color: white;
+  padding: 23px;
+  border-radius: 3px;
+}
+
+.general small {
+  color: #aeb7b0;
+  font-size: 10px;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+}
+
+.general h2 {
+  font-size: 21px;
+  font-weight: 400;
+  margin: 12px 0 20px;
+}
+
+.actions {
+  display: flex;
+  gap: 9px;
+}
+
+.actions button {
+  flex: 1;
+  padding: 11px;
+  border: 1px solid #626c64;
+  background: transparent;
+  color: white;
+  font-size: 11px;
+  border-radius: 2px;
+}
+
+.actions button.primary {
+  background: var(--green);
+  border-color: var(--green);
+}
+
+.summary {
+  background: var(--surface);
+  padding: 23px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+}
+
+.summary small {
+  font-size: 10px;
+  letter-spacing: .16em;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+.summary strong {
+  display: block;
+  font-size: 35px;
+  font-weight: 400;
+  margin: 9px 0 3px;
+}
+
+.summary p {
+  font-size: 11px;
+  color: var(--muted);
+  margin: 0;
+}
+
+/* FLOORS */
+
+.floor {
+  margin-bottom: 40px;
+}
+
+.floor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 12px;
+  margin-bottom: 15px;
+}
+
+.floor-header h2 {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+
+.floor-header span {
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.rooms {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+/* ROOM CARD */
+
+.room {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  padding: 18px;
+  min-height: 135px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition: .2s;
+}
+
+.room.active {
+  border-color: var(--green);
+  background: #f2f5f0;
+}
+
+.room-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.room-name {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.room-number {
+  color: var(--muted);
+  font-size: 9px;
+  letter-spacing: .1em;
+}
+
+.room-bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 22px;
+}
+
+.room-status {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.room.active .room-status {
+  color: var(--green);
+}
+
+.toggle {
+  width: 39px;
+  height: 22px;
+  background: #d4d6cf;
+  border: 0;
+  border-radius: 20px;
+  padding: 3px;
+  transition: .2s;
+}
+
+.toggle::after {
+  content: "";
+  display: block;
+  width: 16px;
+  height: 16px;
+  background: white;
+  border-radius: 50%;
+  transition: .2s;
+}
+
+.toggle.on {
+  background: var(--green);
+}
+
+.toggle.on::after {
+  transform: translateX(17px);
+}
+
+/* FOOTER */
+
+footer {
+  border-top: 1px solid var(--line);
+  padding-top: 18px;
+  color: var(--muted);
+  font-size: 10px;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.message {
+  font-size: 11px;
+  color: var(--muted);
+  margin: 18px 0;
+  min-height: 16px;
+}
+
+button:disabled {
+  opacity: .5;
+  cursor: wait;
+}
+
+@media(max-width:650px) {
+  main {
+    padding: 22px 15px 40px;
+  }
+
+  .rooms {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 9px;
+  }
+
+  .room {
+    padding: 14px;
+    min-height: 125px;
+  }
+
+  .overview {
+    grid-template-columns: 1fr;
+  }
+
+  h1 {
+    font-size: 36px;
+  }
+}
+
+@media(max-width:370px) {
+  .rooms {
+    grid-template-columns: 1fr;
+  }
+}
+</style>
+</head>
+
+<body>
+<main>
+
+<header>
+  <div class="brand">
+    RESIDENCE
+    <span>SMART HOME SYSTEM</span>
+  </div>
+
+  <div class="connection">
+    <span class="dot" id="dot"></span>
+    <span id="connection">Conectando</span>
+  </div>
+</header>
+
+<section class="intro">
+  <div class="eyebrow">Sistema de automatización residencial</div>
+  <h1>Control de iluminación.</h1>
+  <p>Gestiona la iluminación de cada espacio de tu vivienda.</p>
+</section>
+
+<section class="overview">
+
+  <div class="general">
+    <small>Control general</small>
+    <h2>Iluminación de la vivienda</h2>
+
+    <div class="actions">
+      <button class="primary" id="allOn">
+        Encender todo
+      </button>
+
+      <button id="allOff">
+        Apagar todo
+      </button>
+    </div>
+  </div>
+
+  <div class="summary">
+    <small>Estado de iluminación</small>
+    <strong id="count">0 / 30</strong>
+    <p id="summaryText">Luces encendidas</p>
+  </div>
+
+</section>
+
+<div id="floors"></div>
+
+<p class="message" id="message" aria-live="polite"></p>
+
+<footer>
+  <span>RESIDENCE © 2026</span>
+  <span>ESP32 · SMART LIGHTING</span>
+</footer>
+
+</main>
+
 <script>
-const message=document.getElementById('message'),connection=document.getElementById('connection');let busy=false;
-function addLeds(containerId,first,count,firstChip){const grid=document.getElementById(containerId);for(let local=0;local<count;local++){const ledIndex=first+local,chip=firstChip+Math.floor(local/8),pin=local%8,item=document.createElement('div');item.className='led';item.innerHTML=`<div><strong>LED ${local+1}</strong><small>74HC595 #${chip} · Q${pin}</small></div><button class="toggle" data-led="${ledIndex}" aria-pressed="false">Apagado</button>`;grid.appendChild(item)}}
-addLeds('alta',0,13,1);addLeds('sotano',13,4,3);addLeds('baja',17,13,4);
-function draw(states){document.querySelectorAll('.toggle').forEach(b=>{const on=!!states[Number(b.dataset.led)];b.classList.toggle('on',on);b.textContent=on?'Encendido':'Apagado';b.setAttribute('aria-pressed',String(on))})}
-async function request(path){if(busy)return;busy=true;message.textContent='Enviando…';document.querySelectorAll('button').forEach(b=>b.disabled=true);try{const r=await fetch(path,{cache:'no-store'});if(!r.ok)throw Error();const d=await r.json();draw(d.state);message.textContent='Estado actualizado.';connection.textContent='Conectado'}catch(e){message.textContent='No se pudo contactar al ESP32. Comprueba que sigas conectado a su red.';connection.textContent='Sin conexión'}finally{busy=false;document.querySelectorAll('button').forEach(b=>b.disabled=false)}}
-document.querySelectorAll('.grid').forEach(grid=>grid.addEventListener('click',e=>{const b=e.target.closest('.toggle');if(!b)return;const led=Number(b.dataset.led),on=b.getAttribute('aria-pressed')!=='true';request(`/api/led?led=${led}&on=${on?1:0}`)}));
-document.getElementById('allOn').addEventListener('click',()=>request('/api/all?on=1'));document.getElementById('allOff').addEventListener('click',()=>request('/api/all?on=0'));
-(async()=>{try{const r=await fetch('/api/state',{cache:'no-store'});if(!r.ok)throw Error();const d=await r.json();draw(d.state)}catch(e){connection.textContent='Sin conexión';message.textContent='No se pudo leer el estado.'}})();
-</script></body></html>
+
+// DISTRIBUCIÓN DE LOS 30 CANALES
+// Los números de LED comienzan en cero.
+
+const floors = [
+  {
+    name: "Planta alta",
+    subtitle: "Nivel 02 · 13 circuitos",
+    rooms: [
+      {name:"Habitación principal", leds:[0,1]},
+      {name:"Vestidor", leds:[2]},
+      {name:"Baño principal", leds:[3]},
+      {name:"Habitación secundaria", leds:[4,5]},
+      {name:"Baño compartido", leds:[6]},
+      {name:"Estudio", leds:[7,8]},
+      {name:"Pasillo", leds:[9]},
+      {name:"Estancia familiar", leds:[10,11]},
+      {name:"Escalera", leds:[12]}
+    ]
+  },
+  {
+    name: "Sótano",
+    subtitle: "Nivel -01 · 4 circuitos",
+    rooms: [
+      {name:"Cochera", leds:[13]},
+      {name:"Bodega", leds:[14]},
+      {name:"Cuarto de máquinas", leds:[15]},
+      {name:"Escalera", leds:[16]}
+    ]
+  },
+  {
+    name: "Planta baja",
+    subtitle: "Nivel 01 · 13 circuitos",
+    rooms: [
+      {name:"Sala de estar", leds:[17,18]},
+      {name:"Comedor", leds:[19,20]},
+      {name:"Cocina", leds:[21,22]},
+      {name:"Medio baño", leds:[23]},
+      {name:"Recibidor", leds:[24]},
+      {name:"Terraza", leds:[25,26]},
+      {name:"Jardín", leds:[27,28]},
+      {name:"Pasillo", leds:[29]}
+    ]
+  }
+];
+
+// ESTADO DE LOS LEDS
+
+let states = Array(30).fill(false);
+let busy = false;
+
+const floorsContainer = document.getElementById("floors");
+const message = document.getElementById("message");
+
+// GENERAR HABITACIONES
+
+floors.forEach((floor, floorIndex) => {
+
+  const section = document.createElement("section");
+  section.className = "floor";
+
+  section.innerHTML = `
+    <div class="floor-header">
+      <h2>${floor.name}</h2>
+      <span>${floor.subtitle}</span>
+    </div>
+    <div class="rooms"></div>
+  `;
+
+  const grid = section.querySelector(".rooms");
+
+  floor.rooms.forEach(room => {
+
+    const card = document.createElement("article");
+    card.className = "room";
+
+    card.dataset.leds = room.leds.join(",");
+
+    card.innerHTML = `
+      <div class="room-top">
+        <span class="room-name">${room.name}</span>
+        <span class="room-number">
+          ${String(room.leds[0]+1).padStart(2,"0")}
+        </span>
+      </div>
+
+      <div class="room-bottom">
+        <span class="room-status">Apagado</span>
+        <button class="toggle"
+          aria-label="Cambiar iluminación de ${room.name}"
+          aria-pressed="false">
+        </button>
+      </div>
+    `;
+
+    grid.appendChild(card);
+  });
+
+  floorsContainer.appendChild(section);
+});
+
+// ACTUALIZAR INTERFAZ
+
+function draw() {
+
+  let total = 0;
+
+  document.querySelectorAll(".room").forEach(card => {
+
+    const leds = card.dataset.leds.split(",").map(Number);
+
+    const on = leds.every(i => states[i]);
+    const some = leds.some(i => states[i]);
+
+    if (some) total += leds.filter(i => states[i]).length;
+
+    card.classList.toggle("active", on);
+
+    const toggle = card.querySelector(".toggle");
+    const status = card.querySelector(".room-status");
+
+    toggle.classList.toggle("on", on);
+    toggle.setAttribute("aria-pressed", String(on));
+
+    status.textContent = on
+      ? "Encendido"
+      : some ? "Parcial" : "Apagado";
+  });
+
+  document.getElementById("count").textContent =
+    `${total} / 30`;
+
+  document.getElementById("summaryText").textContent =
+    "Luces encendidas";
+}
+
+// COMUNICACIÓN CON ESP32
+
+async function request(path) {
+
+  if (busy) return;
+
+  busy = true;
+  message.textContent = "Actualizando iluminación...";
+
+  document.querySelectorAll("button").forEach(b => {
+    b.disabled = true;
+  });
+
+  try {
+
+    const response = await fetch(path, {
+      cache: "no-store"
+    });
+
+    if (!response.ok) throw Error();
+
+    const data = await response.json();
+
+    states = data.state.map(Boolean);
+
+    draw();
+
+    message.textContent = "Sistema actualizado.";
+    setConnection(true);
+
+  } catch(error) {
+
+    message.textContent =
+      "No se pudo conectar con el ESP32.";
+
+    setConnection(false);
+
+  } finally {
+
+    busy = false;
+
+    document.querySelectorAll("button").forEach(b => {
+      b.disabled = false;
+    });
+  }
+}
+
+// CONTROL INDIVIDUAL DE HABITACIONES
+
+document.querySelectorAll(".room").forEach(card => {
+
+  card.querySelector(".toggle").addEventListener("click", async () => {
+
+    if (busy) return;
+
+    const leds = card.dataset.leds.split(",").map(Number);
+
+    const turnOn = !leds.every(i => states[i]);
+
+    busy = true;
+    message.textContent = "Actualizando habitación...";
+
+    document.querySelectorAll("button").forEach(b => {
+      b.disabled = true;
+    });
+
+    try {
+
+      await Promise.all(leds.map(async led => {
+
+        const response = await fetch(
+          `/api/led?led=${led}&on=${turnOn ? 1 : 0}`,
+          {cache:"no-store"}
+        );
+
+        if (!response.ok) throw Error();
+      }));
+
+      const response = await fetch("/api/state", {
+        cache:"no-store"
+      });
+
+      if (!response.ok) throw Error();
+
+      const data = await response.json();
+
+      states = data.state.map(Boolean);
+
+      draw();
+      setConnection(true);
+      message.textContent = "Habitación actualizada.";
+
+    } catch(error) {
+
+      message.textContent =
+        "Error al controlar la habitación.";
+
+      setConnection(false);
+
+    } finally {
+
+      busy = false;
+
+      document.querySelectorAll("button").forEach(b => {
+        b.disabled = false;
+      });
+    }
+  });
+});
+
+// CONTROL GENERAL
+
+document.getElementById("allOn").addEventListener(
+  "click", () => request("/api/all?on=1")
+);
+
+document.getElementById("allOff").addEventListener(
+  "click", () => request("/api/all?on=0")
+);
+
+// CONEXIÓN
+
+function setConnection(connected) {
+
+  document.getElementById("connection").textContent =
+    connected ? "En línea" : "Sin conexión";
+
+  document.getElementById("dot").style.background =
+    connected ? "#647b6e" : "#c46c61";
+}
+
+// CONSULTA INICIAL
+
+(async () => {
+
+  try {
+
+    const response = await fetch("/api/state", {
+      cache:"no-store"
+    });
+
+    if (!response.ok) throw Error();
+
+    const data = await response.json();
+
+    states = data.state.map(Boolean);
+
+    draw();
+    setConnection(true);
+
+  } catch(error) {
+
+    setConnection(false);
+    message.textContent =
+      "No se pudo leer el estado del sistema.";
+
+  }
+
+})();
+
+</script>
+</body>
+</html>
